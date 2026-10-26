@@ -85,7 +85,7 @@ defmodule PlanoWeb do
       # HTML escaping functionality
       import Phoenix.HTML
       # Core UI components
-      import PlanoWeb.CoreComponents
+      use PlanoWeb.Components.MishkaComponents
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

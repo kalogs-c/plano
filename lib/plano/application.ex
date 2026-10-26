@@ -15,7 +15,8 @@ defmodule Plano.Application do
       # Start a worker by calling: Plano.Worker.start_link(arg)
       # {Plano.Worker, arg},
       # Start to serve requests, typically the last entry
-      PlanoWeb.Endpoint
+      PlanoWeb.Endpoint,
+      {AshAuthentication.Supervisor, [otp_app: :plano]}
     ]
 
     # See https://elixir.hexdocs.pm/Supervisor.html

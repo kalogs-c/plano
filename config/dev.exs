@@ -1,5 +1,9 @@
 import Config
 
+config :ash,
+  policies: [show_policy_breakdowns?: true],
+  keyset_signing_secret: "YndwChyVEmLz2LRk5aYLkFlhUN45T+sM68i6WDiMTH8"
+
 # Configure your database
 config :plano, Plano.Repo,
   username: "postgres",
@@ -53,7 +57,7 @@ config :plano, PlanoWeb.Endpoint,
 # different ports.
 
 # Enable dev routes for dashboard and mailbox
-config :plano, dev_routes: true
+config :plano, dev_routes: true, token_signing_secret: "9fFHdAbcztzm2CcLG23w99qzlMNBzkZg"
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

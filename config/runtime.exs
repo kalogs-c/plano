@@ -84,6 +84,21 @@ if config_env() == :prod do
     ],
     secret_key_base: secret_key_base
 
+  config :ash,
+    keyset_signing_secret:
+      :crypto.mac(
+        :hmac,
+        :sha256,
+        System.get_env("SECRET_KEY_BASE") ||
+          raise("environment variable SECRET_KEY_BASE is missing"),
+        "ash keyset signing"
+      )
+
+  config :plano,
+    token_signing_secret:
+      System.get_env("TOKEN_SIGNING_SECRET") ||
+        raise("Missing environment variable `TOKEN_SIGNING_SECRET`!")
+
   # ## SSL Support
   #
   # To get SSL working, you will need to add the `https` key

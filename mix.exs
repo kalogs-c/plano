@@ -11,7 +11,8 @@ defmodule Plano.MixProject do
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      consolidate_protocols: Mix.env() != :dev
     ]
   end
 
@@ -40,6 +41,21 @@ defmodule Plano.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:ex_money_sql, "~> 2.0"},
+      {:bcrypt_elixir, "~> 3.0"},
+      {:picosat_elixir, "~> 0.2"},
+      {:sourceror, "~> 1.8", only: [:dev, :test]},
+      {:ash_money, "~> 0.2"},
+      {:usage_rules, "~> 1.0", only: [:dev]},
+      {:tidewave, "~> 0.9", only: [:dev]},
+      {:mishka_chelekom, "~> 0.0", only: [:dev]},
+      {:live_debugger, "~> 1.0", only: [:dev]},
+      {:ash_admin, "~> 1.0"},
+      {:ash_authentication_phoenix, "~> 2.0"},
+      {:ash_authentication, "~> 4.0"},
+      {:ash_phoenix, "~> 2.0"},
+      {:ash_postgres, "~> 2.0"},
+      {:ash, "~> 3.0"},
       {:igniter, "~> 0.6", only: [:dev, :test]},
       {:phoenix, "~> 1.8.16"},
       {:phoenix_ecto, "~> 4.5"},
@@ -85,10 +101,10 @@ defmodule Plano.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
+      setup: ["deps.get", "ash.setup", "assets.setup", "assets.build", "run priv/repo/seeds.exs"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      test: ["ash.setup --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind plano", "esbuild plano"],
       "assets.deploy": [

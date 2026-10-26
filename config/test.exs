@@ -1,5 +1,13 @@
 import Config
 
+config :plano, token_signing_secret: "vII8JWxASw5ZvN94So4L53OfForGyfvl"
+config :bcrypt_elixir, log_rounds: 1
+
+config :ash,
+  policies: [show_policy_breakdowns?: true],
+  keyset_signing_secret: "D4YT0kv15UvNg+PyOxAwLt1KNg95/U30m8zJJMv5jt4",
+  disable_async?: true
+
 # Configure your database
 #
 # The MIX_TEST_PARTITION environment variable can be used
