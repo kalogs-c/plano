@@ -1,5 +1,15 @@
 # Plano
 
+Plano is a personal finance tracker for income and expenses, with an optional
+social layer for sharing bills. Records are private by default and need no
+group; later phases add groups, group-visible transactions, and per-member
+splits.
+
+Product and engineering decisions live in [docs/design.md](docs/design.md); the
+phase-by-phase execution plan lives in [docs/roadmap.md](docs/roadmap.md).
+
+## Getting started
+
 To start your Phoenix server:
 
 * Run `mix setup` to install and setup dependencies

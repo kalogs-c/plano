@@ -1,31 +1,41 @@
 # Plano — Design
 
-Multi-tenant (per family) personal finance tracker. Incomes and expenses are
-**private by default**; users may make records visible to their whole family
-or share a specific bill with selected members to split its value.
+Personal finance tracker for income and expenses. Every record is **private to
+its owner by default** and requires no group. Groups, shared visibility, and
+bill splitting are an optional social layer added on top of the personal
+tracker.
 
-Status: v1 — MVP scope (Phase 0 of roadmap).
+Status: v2 — personal-first MVP scope (Phase 0 of roadmap).
 
 ---
 
 ## 1. Product scope
 
-### In scope (MVP)
+### In scope (MVP — personal finance)
 
-- Multi-family environment: a user may belong to one or more families.
-- Create incomes and expenses privately.
-- Mark a transaction as visible to the whole family.
-- Share a transaction with selected family members and split its amount
+- Accounts, authentication, and a per-user default currency.
+- Create, edit, delete, and list incomes and expenses.
+- Assign each transaction to a personal category (income or expense).
+- Monthly dashboard: total income, total expenses, net, recent activity, and a
+  per-category breakdown.
+- Filter transactions by kind, month, and category.
+- Strong, policy-enforced privacy: a transaction is only ever visible to the
+  user who created it.
+
+### Next (social layer, after the personal MVP)
+
+- Create groups and manage memberships (owner/member roles).
+- Mark a transaction as visible to a whole group.
+- Share a specific bill with selected group members and split its amount
   (equal-split default, per-member amounts editable).
 - Split bookkeeping: each share has a status (`:pending` / `:settled`).
-- Strong, policy-enforced privacy: nothing leaks outside its authorized audience.
 
 ### Explicitly out of scope (future)
 
-- Categories / tags, budgets, reports, recurring transactions
+- Budgets, recurring transactions, advanced reports, export
 - Settlement balancing (who owes whom), notifications, email invitations
-- Multi-currency (per-member or per-transaction)
-- Family owners adding users who don't exist yet
+- Friends/relationships outside groups
+- Multi-currency conversion, per-transaction multi-currency totals
 
 ---
 
@@ -34,125 +44,125 @@ Status: v1 — MVP scope (Phase 0 of roadmap).
 ### `Plano.Accounts` (exists)
 
 - `User` — owned by AshAuthentication (password strategy already installed).
-- Single-currency MVP: each user has a **personal currency setting**
-  (`Accounts.User` field, e.g. `currency`, default `:USD`) applied to new
-  transactions. Note: MVP does **not** convert between currencies; shared
-  transactions and family views assume one currency per family context.
+- Add a **personal currency setting** (`currency`, default `:USD`) used as the
+  currency for newly created transactions.
+- Changing the currency affects only future transactions; existing records keep
+  the currency they were created with. Aggregates are grouped by currency so
+  totals never mix units.
 
-### `Plano.Family` (new)
+### `Plano.Finance` (new — personal core)
 
-- `Family` — belongs to AshPostgres.
-  - Fields: `name`, `default_currency` (Money's currency atom, inherited from
-    creator at creation; family ctor/renew later), `created_by_user_id`.
-  - Actions: `create` (current user becomes owner), `update`/`destroy`
-    (owner only, guarded by policy), `read` (members only).
-- `Membership` — join resource.
-  - Fields: `family_id`, `user_id`, `role` (`:owner` | `:member`, default `:member`).
-  - Constraints: unique index on `{family_id, user_id}`; exactly one owner per
-    family is guaranteed by: `Family.create` inserts the first membership as
-    owner; role changes limited by policy + validation ("cannot demote last owner").
-  - Actions: create/register/update role/destroy — owner-only via policy.
-  - Accepting a shared transaction requires membership, not a specific role.
-
-### `Plano.Finance` (new)
+- `Category`
+  - Fields: `user_id`, `name`, `kind` (`:income` | `:expense`), `color`
+    (hex string, optional).
+  - Unique index on `{user_id, kind, name}`.
+  - Actions: create, read, update, destroy — all owner-scoped.
+  - Categories are personal; they are never shared or visible to a group.
+  - No hierarchy (sub-categories) in MVP.
 
 - `Transaction`
-  - Fields: `kind` (`:income` | `:expense`), `description`, `amount`
-    (`Money` — Presents an `AshMoney` type; dual-write integer+currency under
-    the hood via AshMoney extension), `date`, `visibility`
-    (`:private` | `:family` | `:shared`, default `:private`), `family_id`
-    (nil for purely personal records — see decision D1), `created_by_user_id`.
-  - Attributes must satisfy: when `visibility == :family`, `family_id` is
-    required; when `:shared`, `family_id` is required too (sharing happens
-    inside a family; you can split with anyone in that family).
+  - Fields: `kind` (`:income` | `:expense`), `description`, `notes`
+    (optional), `amount` (`Money` via `AshMoney`), `date`, `category_id`
+    (nullable), `created_by_user_id`.
+  - Validation: `category_id` must reference a category owned by the same user,
+    and the category's `kind` must match the transaction's `kind`.
+  - Currency: taken from the actor's `currency` setting at create time.
   - Actions:
-    - `create` — author = actor; `family_id` (if set) must be one the actor
-      belongs to (validated in change/preparation).
-    - `update` / `destroy` — creator, or family owner (for `:family` /
-      `:shared` records).
-    - `read` — see §3 policies.
-    - `share` action — sets `visibility: :shared` + upserts shares in one
-      atomic change (see below).
+    - `create` — author = actor; category validated against the actor.
+    - `update` / `destroy` / `read` — creator only (owner-scoped policies).
+  - No `group_id` or `visibility` field yet. These are added in a later phase
+    as nullable columns, so the personal model stays minimal now.
+
+### `Plano.Social` (later — not part of the personal MVP)
+
+- `Group` — `name`, `created_by_user_id`, `created_at`.
+  - Actions: create (creator becomes owner), update/destroy (owner only),
+    read (members only).
+- `Membership` — join resource.
+  - Fields: `group_id`, `user_id`, `role` (`:owner` | `:member`, default
+    `:member`).
+  - Unique index on `{group_id, user_id}`.
+  - `Group.create` inserts the first membership as owner in the same
+    transaction. Validation: the last owner cannot be demoted or removed.
+  - Actions: create/update role/destroy — owner-only via policy; read for
+    members of the group.
+
+### Sharing (later)
+
+- `Transaction` gains `group_id` (nullable) and `visibility`
+  (`:private` | `:group` | `:shared`, default `:private`).
+  - When `visibility == :group`, `group_id` is required.
+  - When `visibility == :shared`, `group_id` is required; splitting happens
+    inside a group.
 - `TransactionShare`
   - Fields: `transaction_id`, `member_user_id` (must be a member of the
-    transaction's family), `amount` (`Money`), `status`
+    transaction's group), `amount` (`Money`), `status`
     (`:pending` | `:settled`, default `:pending`), `settled_at` (nullable).
   - Unique index on `{transaction_id, member_user_id}`.
   - Validations:
-    - Sum of shares == `transaction.amount` (enforced when sharing/creating;
-      equal split is the default computed automatically if no amounts given).
-    - No share for the transaction's creator unless the creator is explicitly
-      included (creator's share defaults to remainder).
-  - Action `mark_settled` — actor may settle only their own share.
-    Neither creator nor owner may settle on behalf of another member in MVP.
+    - Sum of shares == `transaction.amount` (enforced when sharing/creating).
+    - Equal split is the default when only members are provided.
+    - No share for the transaction's creator unless explicitly included
+      (the creator's share defaults to the remainder).
+  - Action `mark_settled` — an actor may settle only their own share.
 
 ---
 
 ## 3. Authorization (privacy-as-policy)
 
-**Decision D1 (approved):** no Ash `multitenancy` attribute isolation.
-Every record starts private; access is expressed entirely as **Ash policies**.
-`family_id` is nullable so that personal records can exist without a family.
+**Decision D1 (approved):** no Ash `multitenancy` attribute isolation. Every
+record starts private; access is expressed entirely as **Ash policies**. The
+personal MVP therefore has no group/tenant requirement.
 
-**Decision D2 (approved):** splits are **per-member amounts** (editable after
-equal-split default). **Decision D3 (approved):** one currency for all in MVP,
-stored as `Money` so the model is multi-currency-ready later.
+### Personal MVP
+
+- `Category`: read/update/destroy only when `user_id == actor.id`; create sets
+  `user_id` from the actor.
+- `Transaction`: read/update/destroy only when
+  `created_by_user_id == actor.id`; create sets the author from the actor.
+- `category_id` ownership and kind match are validated server-side in a
+  change/preparation.
+- No UI gating duplicates authorization; filters are presentation aids only.
+
+### Social layer (later)
 
 Policy matrix (applies to `Transaction` and (read) `TransactionShare`):
 
 | Visibility | Who can read | Who can update/destroy |
 |---|---|---|
 | `:private` | creator | creator |
-| `:family` | creator + all members of `family_id` | creator or family owner |
-| `:shared` | creator + members holding a `TransactionShare` | creator (+ owner per above) |
-
-Concrete policy skeleton (implement in Phase 2, not yet enforced):
-
-```elixir
-policies do
-  # creator bypass for everything they own
-  always()
-    |> expr(...)
-  policy action_type(:read) do
-    authorize_if expr(visibility == :private and created_by_user_id == ^actor(:id))
-    authorize_if expr(visibility == :family and family_id in ^actor(:family))
-    # ^ requires an actor aggregate/relationship "family" (list of family_ids)
-    authorize_if exists(shares, member_user_id == ^actor(:id))
-  end
-  policy action_type([:update, :destroy]) do
-    authorize_if expr(created_by_user_id == ^actor(:id))
-    authorize_if expr(visibility != :private and
-                      exists(family, exists(memberships, user_id == ^actor(:id) and role == :owner)))
-  end
-  policy update_only(actor_attribute_changed(:visibility)) do
-    # changing to :shared requires TransactionShare authorization too
-  end
-end
-```
+| `:group` | creator + all members of `group_id` | creator or group owner |
+| `:shared` | creator + members holding a `TransactionShare` | creator (+ group owner per above) |
 
 `Membership` policies:
-- Owner of family ⇒ everything on its memberships (create/update/destroy).
-- Read: members of the family can read who else is in it (needed for share UI).
+- Owner of the group ⇒ everything on its memberships (create/update/destroy).
+- Read: members of the group can read who else is in it (needed for share UI).
 
-Other guarantees:
-- `family_id` validation on create/update: actor must be member of that family.
+Additional guarantees for the social layer:
+- `group_id` validation on create/update: actor must be a member of that group.
 - `TransactionShare.member_user_id` validation: target must be a member of the
-  transaction's family.
-- All policy checks happen server-side; no UI gating duplicates authorization.
+  transaction's group.
+- All policy checks happen server-side.
 
 ---
 
 ## 4. Data & API namespaces
 
-Directories to create in Phase 1/2:
+Current phase (personal core):
 
 ```
-lib/plano/family/family.ex
-lib/plano/family/membership.ex
-lib/plano/family.ex                # domain module
+lib/plano/finance/category.ex
 lib/plano/finance/transaction.ex
+lib/plano/finance.ex                # domain module
+```
+
+Later phases (social + sharing):
+
+```
+lib/plano/social/group.ex
+lib/plano/social/membership.ex
+lib/plano/social.ex                 # domain module
 lib/plano/finance/transaction_share.ex
-lib/plano/finance.ex               # domain module
 ```
 
 Extensions: `AshPostgres.DataLayer`, `AshAuthentication` (existing),
@@ -160,21 +170,46 @@ Extensions: `AshPostgres.DataLayer`, `AshAuthentication` (existing),
 
 ---
 
-## 5. LiveView surface (Phase 4)
+## 5. LiveView surface
 
-- `/families` — list my families; create new; family detail (members, roles,
-  naming) with owner-only actions.
-- `/transactions` — main list; filter tabs `mine | shared-with-me | family`.
-- `/transactions/new` and `/transactions/:id/edit` —
-  - kind, description, amount (Money), date, visibility selector
-  - when targeting a family: family picker (my families)
-  - when `:shared`: member multi-select with equal-split default; per-member
-    editable amounts (AshPhoenix nested forms).
-- `/` dashboard — recent transactions across the authorized scopes, per
-  policy; only rows the current actor can see ever reach the client.
+### Personal MVP (Phase 2)
+
+- `/` dashboard — month selector, total income, total expenses, net, recent
+  transactions, and per-category breakdown. Only the actor's rows are ever
+  loaded.
+- `/transactions` — list with `all | income | expense` tabs plus month and
+  category filters.
+- `/transactions/new` and `/transactions/:id/edit` — kind, description, notes,
+  amount (Money input), date, category picker.
+- `/categories` — create, rename, recolor, delete personal categories.
+- `/settings` — default currency (affects new transactions only).
+
+### Social layer (later)
+
+- `/groups` — list my groups; create new; group detail (members, roles, naming)
+  with owner-only actions.
+- Transaction form gains a group picker and visibility selector.
+- When `:shared`: member multi-select with equal-split default and per-member
+  editable amounts (AshPhoenix nested forms).
+- `/transactions` gains `shared-with-me` and `group` filters.
 
 ### Privacy behavior
 
 - Filters in UIs are presentation aids only; enforcement lives in policies.
-- Aggregates (totals) computed on server with policy-aware reads. Private rows
-  don't influence any other member's view.
+- Aggregates (totals) are computed on the server with policy-aware reads. One
+  user's private rows never influence another user's view.
+
+---
+
+## 6. Decisions
+
+- **D1** — Personal-first, policy-based privacy with no Ash multitenancy.
+- **D2** — Categories are personal, flat (no hierarchy), and carry a color.
+- **D3** — Money is stored as `Money`; the user has one default currency and
+  there is no conversion in MVP. Totals are grouped by currency.
+- **D4** — The social concept is `Group` (not `Family`); families are one use
+  case of a group.
+- **D5** — Splits are per-member amounts, editable after an equal-split
+  default.
+- **D6** — `group_id`, `visibility`, and `TransactionShare` are introduced only
+  in the social phases; the personal MVP schema stays minimal.
