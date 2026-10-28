@@ -1,87 +1,96 @@
 # Plano — Roadmap
 
-The execution harness. Each phase ends with a check that must pass before the
-next begins. Keep checkboxes in sync with reality.
+Phase-level execution plan. Granular, pickable tasks live in
+[`docs/tasks/README.md`](tasks/README.md); that board is the source of truth for
+status. Each phase ends with a gate that must pass before the next begins.
 
-- [x] Phase 0 — design freeze (`docs/design.md` v2, personal-first)
-- [ ] Phase 1 — Personal finance core
-- [ ] Phase 2 — Personal finance UI
-- [ ] Phase 3 — Groups
-- [ ] Phase 4 — Sharing & splits
-- [ ] Phase 5 — Hardening
+| Phase | Goal | Tasks | Gate |
+|---|---|---|---|
+| 0 | Design freeze v2, personal-first | — | Done |
+| 1 | Personal finance core | P1-01 … P1-04 | Privacy sweep + `mix precommit` |
+| 2 | Personal finance UI | P2-01 … P2-07 | LiveView tests + `mix precommit` |
+| 3 | Groups | P3-01 … P3-07 | Policy tests + `mix precommit` |
+| 4 | Sharing & splits | P4-01 … P4-06 | Leak-path tests + `mix precommit` |
+| 5 | Hardening | P5-01 … P5-03 | Release gate + `v0.1.0` |
+
+## Phase 0 — Design freeze
+
+- [x] `docs/design.md` v2 (personal-first, groups later)
+- [x] Two-person task board with per-task files
 
 ## Phase 1 — Personal finance core
 
-- [ ] Add `currency` to `Plano.Accounts.User` (default `:USD`) per design §2
-- [ ] Create `Plano.Finance` domain and `Category` resource per design §2
-  - [ ] Owner-scoped policies; unique `{user_id, kind, name}`
-  - [ ] `color` optional, validated as a hex string
-- [ ] Create `Transaction` resource with `kind`, `description`, `notes`,
-      `amount` (AshMoney), `date`, `category_id`, `created_by_user_id`
-  - [ ] Set currency from the actor's `currency` on create
-  - [ ] Validate category ownership and kind match against the transaction
-  - [ ] Owner-scoped policies for read/update/destroy
-- [ ] `mix ash.codegen` + migrations; up `mix ash.setup`
-- [ ] AshAdmin sanity check (dev) — create category and transaction
-- [ ] Tests: transaction CRUD, category CRUD, cross-user isolation, currency
-      set from actor, category ownership/kind rejection
-- [ ] Policy tests: a user cannot read or modify another user's categories or
-      transactions
+Add the per-user currency and the owner-scoped `Category` and `Transaction`
+resources. No groups yet; everything is private.
+
+- [ ] [P1-01](tasks/p1-01-finance-foundation.md) — foundation + migration
+- [ ] [P1-02](tasks/p1-02-category-slice.md) — category slice
+- [ ] [P1-03](tasks/p1-03-transaction-slice.md) — transaction slice
+- [ ] [P1-04](tasks/p1-04-personal-core-gate.md) — phase gate
+
+**Gate:** cross-user privacy tests for both resources pass; `mix precommit`
+green.
 
 ## Phase 2 — Personal finance UI
 
-- [ ] `/` dashboard: month selector, income/expense/net totals, recent
-      transactions, per-category breakdown
-- [ ] `/transactions` list with `all | income | expense` tabs and month /
-      category filters
-- [ ] `/transactions/new` + edit form with Money input, date, category picker
-- [ ] `/categories` management (create, rename, recolor, delete)
-- [ ] `/settings` default currency (affects new transactions only)
-- [ ] AshPhoenix form integration (follow `ash_phoenix/best_practices`)
-- [ ] LiveView tests for create/edit/delete and filters
-- [ ] run `mix precommit`
+Ship a usable personal tracker: dashboard, transaction list/form, categories,
+and settings.
+
+- [ ] [P2-01](tasks/p2-01-ui-foundation.md) — routes, nav, shared components
+- [ ] [P2-02](tasks/p2-02-dashboard.md) — dashboard
+- [ ] [P2-03](tasks/p2-03-transactions-list.md) — list + filters
+- [ ] [P2-04](tasks/p2-04-transaction-form.md) — create/edit form
+- [ ] [P2-05](tasks/p2-05-categories-ui.md) — categories UI
+- [ ] [P2-06](tasks/p2-06-settings-currency.md) — settings/currency
+- [ ] [P2-07](tasks/p2-07-personal-ui-gate.md) — phase gate
+
+**Gate:** every personal page has happy-path + isolation tests; responsive and
+accessible pass; `mix precommit` green.
 
 ## Phase 3 — Groups
 
-- [ ] Create `Plano.Social` domain, `Group` and `Membership` resources per
-      design §2
-- [ ] `Group.create` seeds creator as owner (`:owner` role membership inside
-      the same transaction)
-- [ ] Policies: owner-only CRUD on memberships; group read for members
-- [ ] Validation: last-owner cannot be demoted/removed
-- [ ] `mix ash.codegen` + migrations; up `mix ash.setup`
-- [ ] `/groups` UI: create, list, detail, member management
-- [ ] AshAdmin sanity check (dev) — create group, add member
-- [ ] Tests: create group, add member, role change, owner guard rails
-- [ ] Policy tests: non-members cannot read groups or manage memberships
+Add the social foundation: groups, memberships, and owner rules.
+
+- [ ] [P3-01](tasks/p3-01-social-foundation.md) — social foundation + migration
+- [ ] [P3-02](tasks/p3-02-group-slice.md) — group slice
+- [ ] [P3-03](tasks/p3-03-membership-slice.md) — membership slice
+- [ ] [P3-04](tasks/p3-04-groups-ui-foundation.md) — groups UI foundation
+- [ ] [P3-05](tasks/p3-05-groups-list-create.md) — list + create
+- [ ] [P3-06](tasks/p3-06-group-detail-members.md) — detail + members
+- [ ] [P3-07](tasks/p3-07-groups-gate.md) — phase gate
+
+**Gate:** non-members/non-owners denied; last-owner guard tested; `mix precommit`
+green.
 
 ## Phase 4 — Sharing & splits
 
-- [ ] Add nullable `group_id` + `visibility` (`:private | :group | :shared`)
-      to `Transaction`, with required-group validation for `:group` / `:shared`
-- [ ] Add `TransactionShare` per design §2 with unique
-      `{transaction_id, member_user_id}`
-- [ ] `share` action (atomic): sets visibility, upserts shares, enforces
-      `sum(amount) == transaction.amount`
-- [ ] Equal-split default when only members are provided (no per-member amounts)
-- [ ] Split editor flow: allow per-member adjustment after equal default
-- [ ] `mark_settled` action — only the share's own member
-- [ ] Add `shared-with-me` and `group` filters to `/transactions`
-- [ ] Tests: sum mismatch rejected; leaking through `exists()` policy paths;
-      settling only own share; non-group-member shares rejected
-- [ ] run `mix precommit`
+Make transactions group-visible or shared with selected members, with
+per-member splits and settlement.
+
+- [ ] [P4-01](tasks/p4-01-sharing-foundation.md) — sharing foundation + migration
+- [ ] [P4-02](tasks/p4-02-transaction-visibility-share.md) — visibility + share
+- [ ] [P4-03](tasks/p4-03-share-slice.md) — shares + settlement
+- [ ] [P4-04](tasks/p4-04-sharing-form.md) — sharing form + split editor
+- [ ] [P4-05](tasks/p4-05-shared-group-views.md) — shared/group views
+- [ ] [P4-06](tasks/p4-06-sharing-gate.md) — phase gate
+
+**Gate:** leak-path tests pass; split sums enforced; only own share can be
+settled; `mix precommit` green.
 
 ## Phase 5 — Hardening
 
-- [ ] Full test suite green (`mix precommit` from any dir)
-- [ ] Seed script for demo user + categories + transactions (dev only)
-- [ ] Verify `mix ash.generate_policy_charts` matches design §3 matrix
-- [ ] Tag MVP version in git (v0.1.0)
+- [ ] [P5-01](tasks/p5-01-demo-seeds.md) — demo seeds
+- [ ] [P5-02](tasks/p5-02-policy-audit.md) — policy audit + docs
+- [ ] [P5-03](tasks/p5-03-release-gate.md) — release `v0.1.0`
+
+**Gate:** full `mix precommit` from a clean checkout; `mix setup` from scratch;
+no secrets; tagged `v0.1.0`.
 
 ## Future (parked, not MVP)
 
 - budgets, recurring transactions, advanced reports, export
-- categories hierarchy / tags
+- category hierarchy / tags
 - settlement balances (simplified who-owes-whom), notifications
 - email invitation flow for group owners
+- friends/relationships outside groups
 - multi-currency conversion

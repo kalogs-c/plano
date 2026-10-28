@@ -6,7 +6,8 @@ group; later phases add groups, group-visible transactions, and per-member
 splits.
 
 Product and engineering decisions live in [docs/design.md](docs/design.md); the
-phase-by-phase execution plan lives in [docs/roadmap.md](docs/roadmap.md).
+phase-by-phase execution plan lives in [docs/roadmap.md](docs/roadmap.md), and
+the pickable task board is in [docs/tasks/README.md](docs/tasks/README.md).
 
 ## Getting started
 
