@@ -43,6 +43,17 @@ custom classes must fully style the input
 - Ensure **clean typography, spacing, and layout balance** for a refined, premium look
 - Focus on **delightful details** like hover effects, loading states, and smooth page transitions
 
+### Git workflow
+
+`master` is protected: direct pushes are rejected, including for admins.
+
+- Create a branch, commit, and push it
+- Open a PR with `gh pr create`
+- Get at least one approving review from the other collaborator (self-approval is not possible)
+- Merge via the GitHub UI or `gh pr merge`
+
+Approvals are dismissed when new commits are pushed, force-pushes and branch deletion are blocked, and conversations must be resolved before merging. Since `master` requires an approval from someone else, coordinate with the other collaborator before starting work that needs to land.
+
 
 <!-- usage-rules-start -->
 <!-- usage_rules-start -->
